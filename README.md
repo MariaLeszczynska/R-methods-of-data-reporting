@@ -1,6 +1,6 @@
 # R Methods of Data Reporting
 
-This repository contains my two final projects completed for my Methods of Data Reporting in R course. The course focused on using R and the `tidyverse` to produce clean, communicative, and reproducible data reports, with a strong emphasis on visual storytelling and good code practices.
+This repository contains my two final projects completed for my Methods of Data Reporting in R course. The course focused on using R and tidyverse to produce clean, communicative, and reproducible data reports, with a strong emphasis on visual storytelling and good code practices.
 ---
 ## Projects (report html links below):
 
