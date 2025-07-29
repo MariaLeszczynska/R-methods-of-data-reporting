@@ -1,11 +1,16 @@
 # R Methods of Data Reporting
 
 This repository contains my two final projects completed for my Methods of Data Reporting in R course. The course focused on using R and the `tidyverse` to produce clean, communicative, and reproducible data reports, with a strong emphasis on visual storytelling and good code practices.
+---
+## Projects (report html links below):
 
-Each report was written in R Markdown, and was presented as part of the final assessment.
+### 1. [Food Data - Milk](https://marialeszczynska.github.io/R-methods-of-data-reporting/food_presentation.html)  
+The first report compares different types of milk to assess their nutritional content and determine which type may be the healthiest.
+
+### 2. [Employee Attrition](https://marialeszczynska.github.io/R-methods-of-data-reporting/employeees_presentation.html)
+The second report explores various factors related to employee turnover, helping identify key patterns and potential strategies for retention.
 
 ---
-
 ## What I Learned
 
 ###  Visualization & designing plots
@@ -24,16 +29,4 @@ Each report was written in R Markdown, and was presented as part of the final as
 
 ---
 
-## Projects
 
-### 1.  Food Supply & Obesity
-The first report explores and analyses global food supply patterns and their relationship with obesity rates across countries and income groups.
-- Uses grouped summaries and custom themes
-- Emphasizes clear comparisons across World Bank income levels
-- Applies `ggplot2`, `dplyr`, `tidyr`, and `scales`
-
-### 2. Employee Attrition Report
-The second report is an analysis of HR data to identify drivers of employee attrition.
-- Uses density plots, bar charts, and facet wrapping
-- Applies filtering, grouping, and clear aesthetic design
-- Focuses on presentation and narrative clarity
