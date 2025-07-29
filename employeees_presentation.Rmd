@@ -1,0 +1,387 @@
+---
+title: "Employee attrition"
+author: "Maria Leszczynska"
+date: "2025-01-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Employee attrition is a significant challenge for organizations, impacting productivity, morale, and overall business performance. This analysis explores various factors related to employee turnover, helping identify key patterns and potential strategies for retention.
+
+### Loading libraries
+
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+library(tidyverse) # includes ggplot2, dplyr, etc.
+library(zoo) # for rollmean
+library(mgcv) # if used for any model fitting
+library(ggridges) # for ridgeline plot
+library(emmeans) # if performing marginal means analysis
+library(santoku) # for bucketing
+```
+
+### Loading in the data and having a look
+```{r, echo = FALSE, error = FALSE}
+hr_data = read.csv("HR-Employee-Attrition.csv")
+```
+
+```{r, echo = FALSE, error = FALSE}
+glimpse(hr_data)
+```
+
+```{r, echo = FALSE, error = FALSE}
+summary(hr_data)
+```
+
+```{r, echo = FALSE, error = FALSE}
+colnames(hr_data)
+```
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>% summarise_all(~ sum(is.na(.)))
+```
+
+```{r, echo = FALSE, error = FALSE}
+head(hr_data)
+```
+## Why do employees leave?
+
+### Understanding the age distribution of employees can tell us whether certain age groups are more likely to leave the company:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Age)) +
+  geom_histogram(binwidth = 5, color = "white") +
+  theme_minimal() +
+  labs(title = "Age distribution of employees",
+       x = "Age",
+       y = "Count")
+```
+We can see that largest age group of employees is 28-45 years old.
+
+### Age distribution by attrition:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>% 
+  ggplot(aes(x = Age, fill = Attrition)) +
+  geom_histogram(binwidth = 5, alpha = 0.6, position = "identity") +
+  labs(title = "Age distribution by attrition", x = "Age", y = "Count") +
+  theme_minimal()
+```
+We can see here that young people are more likely to leave the company. This makes sense as they are in the early stages of their careers and want opportunities for growth. I believe this might be the case as the "work culture" has shifted quite a bit and younger workers have a higher standard/expectation regarding the company culture and job satisfaction compared to older employees.
+
+
+### Let's have a look at gender distribution. It helps us understand the gender balance in the company, which may influence attrition trends:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  count(Gender) %>%
+  mutate(Percentage = n / sum(n) * 100) %>%
+  ggplot(aes(x = "", y = n, fill = Gender)) +
+  geom_col(width = 1, color = "white") +
+  geom_text(aes(label = paste0(Gender, "\n", round(Percentage, 1), "%")),
+            position = position_stack(vjust = 0.5),  #centering labels
+            size = 5, color = "white", fontface = "bold") +
+  coord_polar(theta = "y") +
+  scale_fill_manual(values = c("Female" = "#FF69B4", "Male" = "#1E90FF")) +
+  theme_void() +  #removing background, grid, axes, legend
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14)
+  ) +
+  ggtitle("Gender Distribution")
+```
+We can see that the genders are fairly balanced at 40/60 women to men proportion, which suggest that the company cares about diversity and the workplace being inclusive.
+
+### Vertical stacked bar chart of gender distribution instead of a pie chart:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  count(Gender) %>%
+  mutate(Percentage = n / sum(n) * 100) %>%
+  ggplot(aes(x = "", y = n, fill = Gender)) +
+  geom_col(width = 0.7, color = "white") +
+  geom_text(aes(label = paste0(Gender, "\n", round(Percentage, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            size = 5, color = "white", fontface = "bold") +
+  scale_fill_manual(values = c("Female" = "#FF69B4", "Male" = "#1E90FF")) + 
+  labs(title = "Vertical stacked bar of gender distribution",
+       x = NULL, y = "Count") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+```
+It conveys the same information as the pie chart, but it might be more readable for some people.
+
+### Is one gender more likely to leave the company? Let’s now examine if there’s a noticeable difference in attrition rates between genders:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  count(Gender, Attrition) %>%
+  ggplot(aes(x = Gender, y = n, fill = Attrition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Gender distribution by attrition status", x = "Gender", y = "Count") +
+  theme_minimal()
+```
+There isn't a significant difference between the rate at which men and women leave the company, so employee attirition might not be gender related at all at this company.
+
+### Density plot showing the age distribution for men and women:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Age, fill = Gender)) +
+  geom_density(alpha = 0.6) +
+  labs(title = "Age distribution by gender",
+       x = "Age", y = "Density") +
+  theme_minimal()
+```
+Just to be sure, we visualise the density plot for both genders and their ages to see if there are any biases in hiring. It is balanced, so we know there are no policies like hiring prediminantly older women.
+
+### We can look at how age varies across different job roles within the organization. It helps identify if certain job roles are more likely to have younger or older employees:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Age, fill = JobRole)) +
+  geom_histogram(binwidth = 5, position = "stack") +
+  labs(title = "Age distribution by job role", x = "Age", y = "Count") +
+  theme_minimal()
+```
+The data shows that sales executives, sales representatives, and laboratory technicians are primarily young employees. To understand the implications, we should analyze whether these roles have higher or lower turnover rates.
+
+### Let's have a look at the distribution of employees across different job roles and departments:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  count(JobRole, Attrition) %>%
+  ggplot(aes(x = JobRole, y = n, fill = Attrition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Job role distribution by attrition", x = "Job role", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Young employees dominate roles like sales executives, sales representatives, and laboratory technicians, and these positions also show higher attrition rates. This could indicate challenges in retention, possibly due to job demands, career growth opportunities, or workplace conditions
+
+### Boxplot showing the relationship between attrition and the number of years an employee has worked at the company:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Attrition, y = TotalWorkingYears, fill = Attrition)) +
+  geom_boxplot() +
+  labs(title = "Attrition vs. total working years", x = "Attrition", y = "Total working years") +
+  theme_minimal()
+
+```
+The boxplot illustrates that attrition rates decrease as tenure increases. Employees who have been with the company longer are less likely to leave, suggesting that retention efforts may be more effective for long-term employees
+
+### To explore deeper relationships, we can investigate the correlation between age, monthly income, and years at the company, which may help explain trends in attrition:
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  select(Age, MonthlyIncome, YearsAtCompany) %>%
+  cor()
+```
+I was expecting high positive correlation here, but I was suprised to see only medium positive correlation at most.
+
+### Are employees with a long commute more likely to leave?
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = DistanceFromHome, y = MonthlyIncome, color = Attrition)) +
+  geom_point(size = 1, alpha = 0.6) +
+  labs(title = "Distance from home vs. monthly income", x = "Distance from home", y = "Monthly income") +
+  theme_minimal()
+
+```
+
+Yes, employees with a long commute seem to be more likely to leave, but it is not as big of a factor as one would expect. It indicates to me that if employees are happy at a job, they will be more willing to commute and unhappy employees will not be convinced to stay by short commute.
+
+### Education field vs monthly income by attrition:
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = EducationField, y = MonthlyIncome, fill = EducationField)) +
+  geom_boxplot() +
+  facet_wrap(~ Attrition) +
+  labs(title = "Education field vs monthly income by attrition", x = "Education field", y = "Monthly income") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Employees earning below the average salary—especially those in the bottom 25%—are significantly more likely to leave. This suggests that feelings of being undervalued, lack of raises, or limited internal promotions may be key drivers of attrition.
+
+### Boxplot of monthly income by attrition
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Attrition, y = MonthlyIncome, fill = Attrition)) +
+  geom_boxplot() +
+  labs(
+    title = "Monthly income by attrition",
+    x = "Attrition",
+    y = "Monthly income"
+  ) +
+  theme_minimal()
+```
+
+Again, no matter the job, below average pay makes workers feel undervalued and want to leave.
+
+### Are satisfied employees as likely to leave as unhappy ones?
+
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  mutate(JobSatisfaction = as.factor(JobSatisfaction)) %>%
+  ggplot(aes(x = JobSatisfaction, fill = Attrition)) +
+  geom_bar(position = "dodge") +
+  scale_x_discrete(labels = c("1" = "Low", "2" = "Medium", "3" = "High", "4" = "Very High")) +
+  labs(
+    title = "Attrition by job satisfaction",
+    x = "Job satisfaction",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+Employees with higher job satisfaction are far less likely to leave, while unhappy employees show much higher attrition rates. The few satisfied employees who do leave may be doing so for reasons like relocation or career changes, rather than dissatisfaction with the company.
+
+### Age vs monthly income:
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Age, y = MonthlyIncome, color = Attrition)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Age vs. Monthly income",
+       x = "Age", y = "Monthly income") +
+  theme_minimal()
+```
+There is a clear (and very obvious) correlation between age and monthly income, with younger people earning less, which is expected, since salaries increase with experience.
+
+### Age vs years at the company:
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Age, y = YearsAtCompany, color = Attrition)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Age vs. Years at company",
+       x = "Age", y = "Years at company") +
+  theme_minimal()
+
+```
+The plot shows a strong correlation between age and years at the company, as expected. Employees who leave are more common among those with fewer years at the company, which reinforces the trend that newer employees are more likely to quit.
+
+### Years at the company vs monthly income with moving average
+
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+hr_data %>%
+  ggplot(aes(x = YearsAtCompany, y = MonthlyIncome)) +
+  geom_point(alpha = 0.6, color = "blue") +
+  geom_line(aes(y = zoo::rollmean(MonthlyIncome, k = 20, fill = NA)), color = "red", size = 1) +
+  labs(title = "Years at the company vs monthly income with moving average",
+       x = "Years at company", 
+       y = "Monthly income") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(hjust = 1)
+  )
+
+```
+The plot shows the relationship between years at the company and monthly income with a moving average applied, but the result appears unclear due to fluctuations. To better capture the trend, I’ve employed LOESS (Locally Estimated Scatterplot Smoothing), which provides a more flexible and accurate fit to the data.
+
+
+### LOESS 
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = YearsAtCompany, y = MonthlyIncome)) +
+  geom_point(alpha = 0.6, color = "blue") +
+  geom_smooth(method = "loess", formula = y ~ x, color = "red", span = 0.3) +  # Span = 0.3 (more flexible)
+  geom_smooth(method = "loess", formula = y ~ x, color = "green", span = 0.7) +  # Span = 0.7 (smoother)
+  labs(title = "Years at the company vs monthly income (LOESS Smoothing)",
+       x = "Years at company", 
+       y = "Monthly income") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(hjust = 1)
+  )
+
+```
+As we can see, monthly income increases with years worked at the company.
+
+### Monthly income vs education level:
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Education, y = MonthlyIncome)) +
+  geom_point(shape = 1, size = 3, alpha = 0.6, color = "blue") +
+  geom_smooth(method = "lm", formula = y ~ x, color = "red", se = FALSE) +  # Linear model
+  labs(title = "Monthly income vs education level", x = "Education level", y = "Monthly income") +
+  theme_minimal()
+```
+Education level (up to a certain point) does have an impact on montly earnings, but it is actually not as impactful as I thought it would be.
+
+### Monthly income vs attrition
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = Attrition, y = MonthlyIncome, color = Attrition)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", formula = y ~ x, color = "black", se = FALSE) +  # Linear model
+  labs(title = "Monthly income vs attrition", x = "Attrition status", y = "Monthly income") +
+  theme_minimal()
+```
+We can see yet again that workers receiving lower than average monthly income will be more likely to leave.
+
+
+### Analyzing how monthly income relates to job satisfaction and whether employees in different satisfaction categories have different income levels can shed light on employee retention:
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+hr_data %>%
+  ggplot(aes(x = MonthlyIncome, y = factor(JobSatisfaction), fill = factor(JobSatisfaction))) +
+  geom_density_ridges() +
+  scale_fill_viridis_d() +
+  labs(title = "Ridgeline plot of monthly income by job satisfaction", 
+       x = "Monthly income", y = "Job satisfaction level") +
+  theme_minimal()
+```
+Surprisingly, the income is not a strong indicator of job satisfaction. It is possible that other factors, like workplace culture might be more important.
+
+### Histogram of monthly income:
+```{r, echo = FALSE, error = FALSE}
+hr_data %>%
+  ggplot(aes(x = MonthlyIncome)) +
+  geom_histogram(bins = 30, fill = "lightblue", color = "black") +
+  labs(title = "Histogram of monthly income", x = "Monthly income", y = "Frequency") +
+  theme_minimal()
+
+```
+
+We see that most of the employees make below 7500 per month (and those are the employees most likely to quit).
+
+
+### Monthly income by education field with confidence intervals:
+```{r, echo = FALSE, error = FALSE}
+model <- lm(MonthlyIncome ~ EducationField, data = hr_data)
+emmeans_result <- emmeans(model, ~ EducationField)
+emmeans_df <- as.data.frame(emmeans_result)
+emmeans_df <- emmeans_df %>%
+  mutate(
+    lower_ci = emmean - (SE * qt(0.975, df = model$df.residual)),  # Calculate 95% CI
+    upper_ci = emmean + (SE * qt(0.975, df = model$df.residual)),  # Calculate 95% CI
+    lower_se = emmean - SE,   # Lower bound for standard error
+    upper_se = emmean + SE    # Upper bound for standard error
+  )
+
+ggplot(emmeans_df, aes(x = emmean, y = EducationField)) +
+  geom_point(size = 3, color = "blue") +
+  geom_errorbarh(aes(xmin = lower_ci, xmax = upper_ci), height = 0.2, color = "red") +  # Confidence interval error bars
+  labs(title = "Monthly income by education feld with confidence intervals",
+       x = "Estimated monthly income",
+       y = "Education field") +
+  theme_minimal()
+
+```
+We can see that for some fields like "Life Sciences" estimated monthly income or the average monthly income is pretty accurate and the confidence intervals are quite narrow. For other fields ("Human Resources" being the worst of it) the spread of the estimated income is quite wide and the estimate is not as reliable. We can see that the education field has a significant impact on the salary.
+
+
+### In conclusion: our analysis reveals that there are several key factors influencing why employees would leave the company. Younger people are more likely to leave, suggesting that the company might struggle with retaining newer employees, by for example hiring externally instead of promoting within the company (but it could also be caused by the fact that younger people change jobs more often in general). Additionally, employees with lower job satisfaction and those earning less are more likely to quit, which indicates that a fair compensation and a good work environment are essential for retaining employees. Our findings emphasize the importance of addressing job satisfaction, career growth opportunities and good compensation to reduce turnover.
+

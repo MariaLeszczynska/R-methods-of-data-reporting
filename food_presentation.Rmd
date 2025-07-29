@@ -1,0 +1,331 @@
+---
+title: "Food Data - Milk"
+author: "Maria Leszczynska"
+date: "2025-01-16"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+## Introduction:
+In this analysis, we compare different types of milk to assess their nutritional content and determine which type may be the healthiest. The milk categories we focus on include **Whole Milk**, **Reduced Fat (2%)**, **Low Fat (1%)**, **Fat Free (Skim)**, **Human Milk**, **Evaporated/Condensed**, and **Malted/Special Milk**. We specifically examine the following nutrients:
+- **Protein**: Essential for muscle building and overall health.
+- **Fat**: Includes various types such as monounsaturated, polyunsaturated, and saturated fats.
+- **Calcium**: Important for bone health.
+- **Cholesterol**: Often a factor in determining heart health.
+- **Vitamin A**: Essential for vision and immune system function.
+
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(tidyr)
+library(treemapify)
+library(forcats)
+library(ggridges)
+```
+
+```{r, echo = FALSE, error = FALSE}
+food_data = read.csv("food.csv")
+
+```
+
+```{r, echo = FALSE, error = FALSE}
+colnames(food_data)
+```
+
+```{r, echo = FALSE, error = FALSE}
+head(food_data)
+```
+
+```{r, echo = FALSE, error = FALSE}
+food_data %>% summarise(across(everything(), ~sum(is.na(.))))
+```
+
+```{r, echo = FALSE, error = FALSE}
+sum(duplicated(food_data))
+```
+
+```{r, echo = FALSE, error = FALSE}
+milk_data <- food_data %>%
+  filter(Category == "Milk")
+```
+
+```{r, echo = FALSE, error = FALSE}
+milk_data <- milk_data %>%
+  mutate(
+    Milk_Category = case_when(
+      str_detect(Description, "whole") ~ "Whole Milk",
+      str_detect(Description, "2%") | str_detect(Description, "reduced fat") ~ "Reduced Fat (2%)",
+      str_detect(Description, "1%") | str_detect(Description, "low fat") ~ "Low Fat (1%)",
+      str_detect(Description, "skim") | str_detect(Description, "fat free") ~ "Fat Free (Skim)",
+      str_detect(Description, "human") ~ "Human Milk",
+      str_detect(Description, "evaporated") | str_detect(Description, "condensed") ~ "Evaporated/Condensed",
+      str_detect(Description, "malted") | str_detect(Description, "special") ~ "Malted/Special",
+      TRUE ~ "Other"
+    )
+  )
+```
+
+```{r, echo = FALSE, error = FALSE}
+head(milk_data)
+```
+
+```{r, echo = FALSE, error = FALSE}
+nutrients <- c("Data.Beta.Carotene", "Data.Cholesterol", "Data.Protein", "Data.Fat.Monosaturated.Fat", "Data.Fat.Polysaturated.Fat", "Data.Fat.Saturated.Fat", "Data.Fat.Total.Lipid", "Data.Major.Minerals.Calcium", "Data.Vitamins.Vitamin.A...RAE")
+```
+
+### Average protein content across milk categories:
+```{r, echo = FALSE, error = FALSE}
+milk_data %>%
+  group_by(Milk_Category) %>%
+  summarise(Average_Protein = mean(Data.Protein, na.rm = TRUE)) %>%
+  ggplot(aes(x = reorder(Milk_Category, Average_Protein), y = Average_Protein, fill = Milk_Category)) +
+  geom_col() +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Average protein content across milk categories",
+       x = "Milk Category", y = "Average Protein (g)") +
+  theme(legend.position = "none")
+
+
+```
+
+The protein content varies across milk categories with fat free and low fat being the ones with the highest amount of it.
+
+### What is the fat composition in different types of milk?
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+milk_data %>%
+  pivot_longer(cols = c(Data.Fat.Monosaturated.Fat, Data.Fat.Polysaturated.Fat, Data.Fat.Saturated.Fat),
+               names_to = "Fat Type", values_to = "Value") %>%
+  group_by(Milk_Category, `Fat Type`) %>%
+  summarise(Average_Value = mean(Value, na.rm = TRUE)) %>%
+  ggplot(aes(x = Milk_Category, y = Average_Value, fill = `Fat Type`)) +
+  geom_bar(stat = "identity", position = "stack") +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Average fat composition accross milk categories",
+       x = "Milk Category", y = "Average Fat Content (g)")
+
+
+```
+
+I will not consider condensed milk here, as it is just whole milk without water and I want to look at different liquid milk alternatives. The consumer needs to decide what is more important to them - one option is a large amount of "good" fats (aka the mono- and poly- saturated fats) - in which case the milk will also have a high content of saturated or "bad" fats, but will help them absorb other nutrient from foods better. They might also decide they want a low fat option to avoid saturated fats (in case of for example heart disease), in which case they will like skim milk better.
+
+### Protein vs fat in milk:
+
+```{r, echo = FALSE, error = FALSE}
+milk_data %>%
+  ggplot(aes(x = Data.Protein, y = Data.Fat.Total.Lipid, color = Milk_Category)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(title = "Protein vs. fat in milk", x = "Protein (g)", y = "Total lipid (g)")
+
+```
+There seems to be a negative correlation between protein and total fat content in some milk categories. For example, **Fat Free** contains high protein but low fat, while some **Whole Milk(s)** has high fat and lower protein.
+
+### Treemap of calcium content:
+```{r, echo = FALSE, error = FALSE}
+milk_data %>%
+  ggplot(aes(area = Data.Major.Minerals.Calcium, fill = Milk_Category, label = Milk_Category)) +
+  geom_treemap() +
+  geom_treemap_text(fontface = "bold", colour = "white", place = "centre") +
+  theme_minimal() +
+  labs(title = "Treemap of calcium content")
+
+```
+No category stands out as the best source of calcium, which is great since it's a crucial nutrient for bone health.
+
+### Treemap of vitamin A:
+```{r, echo = FALSE, error = FALSE}
+milk_data %>%
+  ggplot(aes(area = Data.Vitamins.Vitamin.A...RAE, fill = Milk_Category, label = Milk_Category)) +
+  geom_treemap() +
+  geom_treemap_text(fontface = "bold", colour = "white", place = "centre") +
+  theme_minimal() +
+  labs(title = "Treemap of vitamin A")
+```
+**Malted/Special** milk stands out as the one with the highest content of vitamin A, which is important for vision and our immune systems.
+
+### Ridgeline plots for density distribution of nutrients:
+
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+milk_data %>%
+  pivot_longer(cols = nutrients, names_to = "Nutrient", values_to = "Value") %>%
+  ggplot(aes(x = Value, y = Nutrient, fill = Milk_Category)) +
+  geom_density_ridges(scale = 3) +
+  scale_fill_manual(values = c("#D55E00", "#009E73", "#56B4E9", "#E69F00", "#F0E442")) +
+  theme_minimal() +
+  labs(title = "Density distribution of nutrients")
+
+```
+We cannot see that well because of outliers, so let us have a look at the data if we exclude them:
+
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+milk_data %>%
+  pivot_longer(cols = nutrients, names_to = "Nutrient", values_to = "Value") %>%
+  filter(Value <= 500) %>%  # Exclude values greater than 500
+  ggplot(aes(x = Value, y = Nutrient, fill = Milk_Category)) +
+  geom_density_ridges(scale = 3) +
+  scale_fill_manual(values = c("#D55E00", "#009E73", "#56B4E9", "#E69F00", "#F0E442")) +
+  theme_minimal() +
+  labs(title = "Density distribution of nutrients (Values capped at 500)")
+
+```
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+milk_data %>%
+  pivot_longer(cols = nutrients, names_to = "Nutrient", values_to = "Value") %>%
+  filter(Value <= 200) %>%  # Exclude values greater than 200
+  ggplot(aes(x = Value, y = Nutrient, fill = Milk_Category)) +
+  geom_density_ridges(scale = 3) +
+  scale_fill_manual(values = c("#D55E00", "#009E73", "#56B4E9", "#E69F00", "#F0E442")) +
+  theme_minimal() +
+  labs(title = "Density distribution of nutrients (Values capped at 500)")
+
+```
+To me, whole milk stands out as the one with the best nutrient content, but the values are not spread that wide apart so it can be consumer's choice.
+
+### Violin plot:
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+milk_data %>%
+  ggplot(aes(x = Milk_Category, y = Data.Protein, fill = Milk_Category)) +
+  geom_violin(drop = FALSE) +  # Retain groups with fewer than 2 data points
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Violin plot for protein")
+
+```
+This violin plot did not work well since we do not have a large enough number of observations, but I wanted to try and see what it would look like :)
+
+### Boxplots of protein and fat content:
+```{r, echo = FALSE, error = FALSE}
+milk_data %>%
+  ggplot(aes(x = Milk_Category, y = Data.Protein, fill = Milk_Category)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Protein content", y = "Protein (g)")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+milk_data %>%
+  ggplot(aes(x = Milk_Category, y = Data.Fat.Total.Lipid, fill = Milk_Category)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Fat content", y = "Fat (g)")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+If we want a lot of protein, but as little fat as possible, skin milk might be our best choice.
+
+### Protein vs calcium:
+```{r, echo = FALSE, error = FALSE}
+milk_data %>%
+  ggplot(aes(x = Data.Protein, y = Data.Major.Minerals.Calcium, color = Milk_Category)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(title = "Protein vs. calcium", x = "Protein (g)", y = "Calcium (mg)")
+
+```
+Besides a few outliers, we can see that calcium and protein content correlate slightly - the higher the protein content, the higher the calcium.
+
+### Density plot for cholesterol and fat types:
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+milk_data %>%
+  pivot_longer(cols = c("Data.Fat.Monosaturated.Fat", "Data.Fat.Polysaturated.Fat", 
+                        "Data.Fat.Saturated.Fat", "Data.Fat.Total.Lipid", "Data.Cholesterol"),
+               names_to = "Nutrient", values_to = "Value") %>%
+  ggplot(aes(x = Value, y = Nutrient, fill = Milk_Category)) +
+  geom_density_ridges(scale = 3) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  labs(title = "Density Plot for cholesterol and fat types")
+
+```
+Let's have a closer look without the outlier:
+
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+milk_data %>%
+  pivot_longer(cols = c("Data.Fat.Monosaturated.Fat", "Data.Fat.Polysaturated.Fat", 
+                        "Data.Fat.Saturated.Fat", "Data.Fat.Total.Lipid", "Data.Cholesterol"),
+               names_to = "Nutrient", values_to = "Value") %>%
+  filter(Value <= 30) %>%  # Filter to include only values below or equal to 30
+  ggplot(aes(x = Value, y = Nutrient, fill = Milk_Category)) +
+  geom_density_ridges(scale = 3) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  labs(title = "Density Plot for Cholesterol and Fat Types (Values below 30)")
+
+```
+```{r, echo = FALSE, error = FALSE, warning = FALSE, message = FALSE}
+milk_data %>%
+  pivot_longer(cols = c("Data.Fat.Monosaturated.Fat", "Data.Fat.Polysaturated.Fat", 
+                        "Data.Fat.Saturated.Fat", "Data.Fat.Total.Lipid", "Data.Cholesterol"),
+               names_to = "Nutrient", values_to = "Value") %>%
+  filter(Value <= 15) %>%  # Filter to include only values below or equal to 15
+  ggplot(aes(x = Value, y = Nutrient, fill = Milk_Category)) +
+  geom_density_ridges(scale = 3) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  labs(title = "Density Plot for Cholesterol and Fat Types (Values below 15)")
+
+```
+For someone who is trying to lower the amount of cholesterol in their diet, fat free milk is the best option, followed by low fat.
+
+### Different plots for cholesterol and fat contents:
+```{r, echo = FALSE, error = FALSE}
+milk_data %>%
+  ggplot(aes(x = Milk_Category, y = Data.Cholesterol, fill = Milk_Category)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Cholesterol content across milk categories", y = "Cholesterol (mg)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+milk_data %>%
+  ggplot(aes(x = Milk_Category, y = Data.Fat.Monosaturated.Fat, fill = Milk_Category)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Monounsaturated fat across milk categories", y = "Monounsaturated fat (g)") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+milk_data %>%
+  ggplot(aes(x = Milk_Category, y = Data.Fat.Polysaturated.Fat, fill = Milk_Category)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Polyunsaturated fat across milk categories", y = "Polyunsaturated fat (g)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+milk_data %>%
+  ggplot(aes(x = Milk_Category, y = Data.Fat.Saturated.Fat, fill = Milk_Category)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Saturated fat across milk categories", y = "Saturated fat (g)") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+milk_data %>%
+  ggplot(aes(x = Milk_Category, y = Data.Fat.Total.Lipid, fill = Milk_Category)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Total fat across milk categories", y = "Total fat (g)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r, echo = FALSE, error = FALSE}
+nutrients_data <- milk_data %>%
+  select(c("Data.Protein", "Data.Fat.Monosaturated.Fat", "Data.Fat.Polysaturated.Fat", 
+           "Data.Fat.Saturated.Fat", "Data.Fat.Total.Lipid", "Data.Cholesterol", 
+           "Data.Major.Minerals.Calcium")) %>%
+  cor()
+corr_data <- as.data.frame(as.table(nutrients_data))
+ggplot(corr_data, aes(Var1, Var2, fill = Freq)) +
+  geom_tile() +
+  scale_fill_gradient2(midpoint = 0, low = "blue", high = "red", mid = "white") +
+  theme_minimal() +
+  labs(title = "Correlation heatmap of nutrients across milk types", 
+       x = "Nutrient", y = "Nutrient") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+        axis.text.y = element_text(angle = 45, hjust = 1)) 
+
+```
+
+### In conclusion, Low Fat (1%) or Fat Free (Skim) milk may be the most suitable for those focused on reducing fat and cholesterol intake, while Whole Milk offers a more balanced approach with higher protein and calcium content. Ultimately, the "healthiest" option depends on personal dietary goals :)
